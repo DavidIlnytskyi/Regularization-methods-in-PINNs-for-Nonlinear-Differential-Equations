@@ -1,0 +1,9 @@
+torch>=2.2
+numpy>=1.26
+scipy>=1.11
+tqdm>=4.66
+neurodiffeq>=0.6
+scikit-fem>=8.0
+matplotlib>=3.8
+seaborn>=0.13
+cycler>=0.12
