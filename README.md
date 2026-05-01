@@ -17,8 +17,8 @@ pip install -r requirements.txt
 
 The Google Drive folders below contain all history files, code history, and experiments.
 
-The work is provided as Jupyter notebooks. Altogether, the files weigh around 300 MB, which exceeds the GitHub upload limit.
+Altogether, the files weigh around 300 MB, which exceeds the GitHub upload limit.
 
-- [Experiments, visualization code, and cleaned code history](https://drive.google.com/drive/folders/1Vl3NE_c0OSBPfJ3cHRPOEHO7Qv7STOCK?usp=sharing)
-- [Original folder where all experiments were set up](https://drive.google.com/drive/folders/1Z_50ZF89xP3Kst_FTG-C2bnQym1ZI7UL?usp=sharing)
+- [Experiments, visualization code, and code history](https://drive.google.com/drive/folders/1Vl3NE_c0OSBPfJ3cHRPOEHO7Qv7STOCK?usp=sharing)
+- [Original folder where all experiments were set up, with corresponding artifacts](https://drive.google.com/drive/folders/1Z_50ZF89xP3Kst_FTG-C2bnQym1ZI7UL?usp=sharing)
 
