@@ -4,10 +4,12 @@
 
 [Davyd Ilnytskyi]([https://your-link-here](https://www.linkedin.com/in/davyd-ilnytskyi/))
 
-**Supervisors:**\\
+**Supervisors:**
 
-[Raul Jimenez](https://sites.google.com/site/rauljimenez/home)\\
-[Oleksii Ignatenko](https://www.linkedin.com/in/oleksii-ignatenko-a5822216)  \\
+[Raul Jimenez](https://sites.google.com/site/rauljimenez/home)
+
+[Oleksii Ignatenko](https://www.linkedin.com/in/oleksii-ignatenko-a5822216)
+
 
 ## Setup
 
