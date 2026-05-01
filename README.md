@@ -1,6 +1,6 @@
 # Regularization-methods-in-PINNs-for-Nonlinear-Differential-Equations
 ## Contributors
-**Author**
+**Author:**
 
 [Davyd Ilnytskyi](https://www.linkedin.com/in/davyd-ilnytskyi/)
 
