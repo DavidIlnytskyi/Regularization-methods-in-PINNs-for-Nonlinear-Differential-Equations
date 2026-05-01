@@ -1,4 +1,8 @@
-### Setup
+# Regularization-methods-in-PINNs-for-Nonlinear-Differential-Equations
+
+
+
+# Setup
 
 This work requires Python3.12.13. Commands to setup it via conda are provided. 
 ```
