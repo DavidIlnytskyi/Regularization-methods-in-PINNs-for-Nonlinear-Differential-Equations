@@ -2,7 +2,7 @@
 ## Contributors
 **Author**
 
-[Davyd Ilnytskyi]([https://your-link-here](https://www.linkedin.com/in/davyd-ilnytskyi/))
+[Davyd Ilnytskyi](https://www.linkedin.com/in/davyd-ilnytskyi/)
 
 **Supervisors:**
 
