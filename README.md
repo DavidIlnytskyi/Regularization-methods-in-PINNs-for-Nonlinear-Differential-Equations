@@ -1,8 +1,14 @@
 # Regularization-methods-in-PINNs-for-Nonlinear-Differential-Equations
+## Contributors
+**Author**
+[Davyd Ilnytskyi]([https://your-link-here](https://www.linkedin.com/in/davyd-ilnytskyi/))
 
+**Supervisors:**
 
+[Raul Jimenez](https://sites.google.com/site/rauljimenez/home)
+[Oleksii Ignatenko](https://www.linkedin.com/in/oleksii-ignatenko-a5822216)  
 
-# Setup
+## Setup
 
 This work requires Python3.12.13. Commands to setup it via conda are provided. 
 ```
