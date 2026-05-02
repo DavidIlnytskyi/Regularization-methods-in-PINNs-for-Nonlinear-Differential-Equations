@@ -1,6 +1,15 @@
+"""Multi-head 2D solver with optional PINN regularization losses.
+
+This module extends ``neurodiffeq``'s ``Solver2D`` for a set of heads that share
+training logic but use different condition/network pairs. It also adds optional
+regularization terms used by the experiments in this repository.
+"""
+
 import sys
 import warnings
+from collections.abc import Callable, Sequence
 from copy import deepcopy
+from typing import Any
 
 sys.path.append("./src")
 
@@ -15,6 +24,7 @@ from neurodiffeq.solvers import Solver2D
 from neurodiffeq.solvers import _requires_closure
 
 from neurodiffeqq import SolutionBundle2D
+
 
 class MHSolver2D(Solver2D):
     r"""A solver class for solving ODEs (single-input differential equations)
@@ -129,31 +139,32 @@ class MHSolver2D(Solver2D):
 
     def __init__(
         self,
-        pde_system,
-        conditions_list,
-        all_nets,
-        theta_min=None,
-        theta_max=None,
-        eq_param_index=(),
-        n_samplings=32,
-        method="equally-spaced-noisy",
-        equations_number=None,
-        flatten=False,
-        UR_period=100,
-        regularization=None,
-        regularization_lambda=0,
-        t_min=0,
-        t_max=1,
-        t_sampling=64,
-        x_min=0,
-        x_max=1,
-        x_sampling=64,
-        param_min=0,
-        param_max=1,
-        param_sampling=64,
+        pde_system: Sequence[Callable[..., Sequence[torch.Tensor]]],
+        conditions_list: np.ndarray[Any, Any],
+        all_nets: np.ndarray[Any, Any],
+        theta_min: float | tuple[float, ...] | None = None,
+        theta_max: float | tuple[float, ...] | None = None,
+        eq_param_index: Sequence[int] = (),
+        n_samplings: int = 32,
+        method: str = "equally-spaced-noisy",
+        equations_number: int | None = None,
+        flatten: bool = False,
+        UR_period: int = 100,
+        regularization: str | None = None,
+        regularization_lambda: float = 0,
+        t_min: float = 0,
+        t_max: float = 1,
+        t_sampling: int = 64,
+        x_min: float = 0,
+        x_max: float = 1,
+        x_sampling: int = 64,
+        param_min: float = 0,
+        param_max: float = 1,
+        param_sampling: int = 64,
         *args,
         **kwargs,
-    ):
+    ) -> None:
+        """Initialize heads, conditions, equation wrappers, and solver state."""
 
         # Pop and set all kwargs as attributes of the instance
         for key, value in kwargs.items():
@@ -191,7 +202,8 @@ class MHSolver2D(Solver2D):
         eq_param_index = tuple(N_FUNCTIONS + N_COORDS + idx for idx in eq_param_index)
         self.eq_param_index = eq_param_index
 
-        def _diff_eqs_wrapper(*variables):
+        def _diff_eqs_wrapper(*variables: torch.Tensor) -> Sequence[torch.Tensor]:
+            """Call the PDE system with only the selected equation parameters."""
             funcs_and_coords = variables[: N_FUNCTIONS + N_COORDS]
             eq_params = tuple(variables[idx] for idx in eq_param_index)
             return pde_system(*funcs_and_coords, *eq_params)
@@ -212,12 +224,25 @@ class MHSolver2D(Solver2D):
         self.metrics_history["r2_loss"] = []
         self.metrics_history["add_loss"] = []
 
-    def custom_epoch(self, key):
+    def custom_epoch(self, key: str) -> None:
+        """Run one train or validation epoch across all solver heads."""
         if self.n_batches[key] <= 0:
             return
 
-        def make_closure(batch, head):
-            def closure(zero_grad=True, backward=None):
+        def make_closure(
+            batch: Sequence[torch.Tensor],
+            head: int,
+        ) -> Callable[
+            [bool, bool | None],
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        ]:
+            """Build an optimizer closure for one batch and head."""
+
+            def closure(
+                zero_grad: bool = True,
+                backward: bool | None = None,
+            ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+                """Compute total, residual, and regularization losses."""
                 if backward is None:
                     backward = key == "train"
 
@@ -281,7 +306,8 @@ class MHSolver2D(Solver2D):
                 for head in range(self.n_heads)
             ]
 
-            def optimizer_closure():
+            def optimizer_closure() -> torch.Tensor:
+                """Accumulate losses for closure-based optimizers."""
                 self.optimizer.zero_grad()
                 accumulated_loss = None
 
@@ -375,11 +401,11 @@ class MHSolver2D(Solver2D):
 
         self._update_history(epoch_total_loss, "loss", key)
 
-    def run_custom_epoch(self):
+    def run_custom_epoch(self) -> None:
         r"""Run a training epoch, update history, and perform gradient descent."""
         self.custom_epoch("train")
 
-    def _update_best(self, key):
+    def _update_best(self, key: str) -> None:
         """Update ``self.lowest_loss`` and ``self.best_nets``
         if current training/validation loss is lower than ``self.lowest_loss``
         """
@@ -389,7 +415,13 @@ class MHSolver2D(Solver2D):
             for i in range(self.n_heads):
                 self.best_nets_list[i] = deepcopy(self.all_nets[:, i])
 
-    def fit(self, max_epochs, callbacks=(), tqdm_file="default", **kwargs):
+    def fit(
+        self,
+        max_epochs: int,
+        callbacks: Sequence[Callable[["MHSolver2D"], None]] = (),
+        tqdm_file: Any = "default",
+        **kwargs: Any,
+    ) -> None:
         r"""Run multiple epochs of training and validation, update best loss at the end of each epoch.
 
         If ``callbacks`` is passed, callbacks are run, one at a time,
@@ -456,7 +488,12 @@ class MHSolver2D(Solver2D):
             if not flag:
                 bar.update(1)
 
-    def get_solution(self, copy=True, best=True, head=None):
+    def get_solution(
+        self,
+        copy: bool = True,
+        best: bool = True,
+        head: int | None = None,
+    ) -> SolutionBundle2D:
         r"""Get a (callable) solution object. See this usage example:
 
         .. code-block:: python3
@@ -499,7 +536,8 @@ class MHSolver2D(Solver2D):
 
         return SolutionBundle2D(nets, conditions)
 
-    def _get_internal_variables(self):
+    def _get_internal_variables(self) -> dict[str, Any]:
+        """Return solver configuration variables used for serialization."""
         available_variables = super(BundleSolver2D, self)._get_internal_variables()
         available_variables.update(
             {
@@ -510,7 +548,8 @@ class MHSolver2D(Solver2D):
         )
         return available_variables
 
-    def l1_regularization(self, head):
+    def l1_regularization(self, head: int) -> torch.Tensor:
+        """Return L1 penalty on the final body layer for transfer learning."""
         if (
             head != self.n_heads - 1
             or self.local_epoch % self.UR_period != 0
@@ -528,7 +567,8 @@ class MHSolver2D(Solver2D):
 
         return loss_sum * self.regularization_lambda
 
-    def l2_regularization(self, head):
+    def l2_regularization(self, head: int) -> torch.Tensor:
+        """Return L2 penalty on the final body layer for transfer learning."""
         if (
             head != self.n_heads - 1
             or self.local_epoch % self.UR_period != 0
@@ -546,7 +586,8 @@ class MHSolver2D(Solver2D):
 
         return loss_sum * self.regularization_lambda
 
-    def jacobian_frobenius_reg_exact(self, head):
+    def jacobian_frobenius_reg_exact(self, head: int) -> torch.Tensor:
+        """Return exact Frobenius-norm Jacobian regularization for body models."""
         if (
             head != self.n_heads - 1
             or self.local_epoch % self.UR_period != 0
@@ -606,7 +647,14 @@ class MHSolver2D(Solver2D):
 
         return self.regularization_lambda * jacobian_loss
 
-    def ur_loss(self, r, f, x, head):
+    def ur_loss(
+        self,
+        r: torch.Tensor,
+        f: Sequence[torch.Tensor],
+        x: Sequence[torch.Tensor],
+        head: int,
+    ) -> torch.Tensor:
+        """Return uniform regularization loss over sampled input parameters."""
         if (
             head != self.n_heads - 1
             or self.local_epoch % self.UR_period != 0
@@ -652,7 +700,13 @@ class MHSolver2D(Solver2D):
         ur_loss = torch.sum(g_det - flat_metric)
         return ur_loss * self.regularization_lambda
 
-    def gpinn_loss(self, residuals, batch, head):
+    def gpinn_loss(
+        self,
+        residuals: torch.Tensor,
+        batch: Sequence[torch.Tensor],
+        head: int,
+    ) -> torch.Tensor:
+        """Return gradient-enhanced PINN loss from residual derivatives."""
         if (
             head != self.n_heads - 1
             or self.local_epoch % self.UR_period != 0

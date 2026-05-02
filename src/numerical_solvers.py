@@ -1,12 +1,35 @@
+"""Finite-element reference solvers for nonlinear 1D PDEs.
+
+These helpers use scikit-fem to compute numerical reference solutions for the
+Burgers, Allen-Cahn, and Fisher-KPP equations. Each public solver returns the
+spatial grid, initial condition, and final solution at the requested time.
+"""
+
+from typing import Any, TypeAlias
+
 import numpy as np
 
 from skfem import MeshLine, Basis, ElementLineP1, BilinearForm, asm, condense, solve
 from skfem.helpers import grad
 
-def solve_burgers(r, dt, T, idx, x_left, x_right, dx):
+Array: TypeAlias = np.ndarray[Any, Any]
+SolverResult: TypeAlias = tuple[Array, Array, Array]
+
+
+def solve_burgers(
+    r: float,
+    dt: float,
+    T: float,
+    idx: int,
+    x_left: float,
+    x_right: float,
+    dx: float,
+) -> SolverResult:
+    """Solve the viscous Burgers equation and return ``x``, ``u0``, and ``u(T)``."""
     nsteps = int(T / dt)
 
-    def burgers_profile(x, idx=0):
+    def burgers_profile(x: Array, idx: int = 0) -> Array:
+        """Return the sinusoidal initial profile for one head index."""
         return -np.sin(np.pi * x + idx * (np.pi / 6.0))
 
     mesh = MeshLine(np.arange(x_left, x_right + dx, dx))
@@ -49,21 +72,39 @@ def solve_burgers(r, dt, T, idx, x_left, x_right, dx):
 
     return x, u0, u
 
-def solve_allen_cahn(r, dt, T, idx, x_left, x_right, dx, reaction_coef = 5):
+
+def solve_allen_cahn(
+    r: float,
+    dt: float,
+    T: float,
+    idx: int,
+    x_left: float,
+    x_right: float,
+    dx: float,
+    reaction_coef: float = 5,
+) -> SolverResult:
+    """Solve the Allen-Cahn equation and return ``x``, ``u0``, and ``u(T)``."""
     nsteps = int(T / dt)
 
-    def ac_profile(x, idx=0):
+    def ac_profile(x: Array, idx: int = 0) -> Array:
+        """Return the polynomial-cosine Allen-Cahn profile."""
         return x**2 * np.cos(np.pi * x + idx * np.pi / 6.0)
 
-    def ac_ic(idx=0):
-        def f(x):
+    def ac_ic(idx: int = 0):
+        """Return an initial-condition function for one head index."""
+
+        def f(x: Array) -> Array:
+            """Evaluate the initial condition on a grid."""
             return ac_profile(x, idx)
+
         return f
 
-    def ac_bc_left(x_left, idx=0):
+    def ac_bc_left(x_left: float, idx: int = 0) -> float:
+        """Return the left boundary value for one head index."""
         return ac_profile(np.array([x_left]), idx)[0]
 
-    def ac_bc_right(x_right, idx=0):
+    def ac_bc_right(x_right: float, idx: int = 0) -> float:
+        """Return the right boundary value for one head index."""
         return ac_profile(np.array([x_right]), idx)[0]
 
     mesh = MeshLine(np.arange(x_left, x_right + dx, dx))
@@ -105,12 +146,22 @@ def solve_allen_cahn(r, dt, T, idx, x_left, x_right, dx, reaction_coef = 5):
     return x, u0, u
 
 
-
-def solve_fisher_kpp(r, dt, T, idx, x_left, x_right, dx, D=1):
+def solve_fisher_kpp(
+    r: float,
+    dt: float,
+    T: float,
+    idx: int,
+    x_left: float,
+    x_right: float,
+    dx: float,
+    D: float = 1,
+) -> SolverResult:
+    """Solve the Fisher-KPP equation and return ``x``, ``u0``, and ``u(T)``."""
     nsteps = round(T / dt)
     idx += 1
 
-    def fisher_ic_np(x, k):
+    def fisher_ic_np(x: Array, k: float) -> Array:
+        """Return the exponential Fisher-KPP initial condition."""
         xi = (x - x_left) / (x_right - x_left)
         return (np.exp(-k * xi) - np.exp(-k)) / (1.0 - np.exp(-k))
 

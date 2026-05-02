@@ -1,11 +1,27 @@
+"""Plotting utilities for training metrics and PINN solution comparisons.
+
+The functions in this module convert tensors or arrays into NumPy data and
+produce Matplotlib figures for metric histories, 1D solution comparisons, and
+solution heatmaps.
+"""
+
 import os
 import sys
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, TypeAlias
 
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
-def ema(x, alpha=0.05):
+ArrayLike: TypeAlias = torch.Tensor | np.ndarray[Any, Any] | Sequence[float]
+
+
+def ema(
+    x: Sequence[float] | np.ndarray[Any, Any],
+    alpha: float = 0.05,
+) -> np.ndarray[Any, Any]:
+    """Return the exponential moving average of a one-dimensional sequence."""
     x = np.asarray(x)
     y = np.zeros_like(x)
     y[0] = x[0]
@@ -14,21 +30,23 @@ def ema(x, alpha=0.05):
     return y
 
 def plot_specific_runs(
-    data,
-    equation_name,
-    models,
-    metric="mse",
-    head_idx=(0,),
-    use_ema=False,
-    start_from=None,
-    title=None,
-):
+    data: Mapping[str, Mapping[str, Mapping[str, Any]]],
+    equation_name: str,
+    models: Sequence[str],
+    metric: str = "mse",
+    head_idx: int | Sequence[int] = (0,),
+    use_ema: bool = False,
+    start_from: int | None = None,
+    title: str | None = None,
+) -> None:
+    """Plot selected metric histories for one equation and set of models."""
     data = data[equation_name]
 
     if not isinstance(head_idx, (list, tuple)):
         head_idx = [head_idx]
 
-    def get_metric_data(model, head):
+    def get_metric_data(model: str, head: int) -> Sequence[float] | None:
+        """Return the metric series for a model/head pair."""
         if metric in {"mae", "mse", "l2_rel"}:
             return data[model][metric][head]
 
@@ -81,15 +99,16 @@ def plot_specific_runs(
 
 
 def plot_solution_times(
-    num_solver,
-    times=(0.0, 0.2, 0.5, 0.8),
-    r=0.01,
-    dt=0.001,
-    dx=0.0001,
-    x_left=0.0,
-    x_right=1.0,
-    title="Exact solution",
-):
+    num_solver: Callable[..., tuple[Any, Any, Any]],
+    times: Sequence[float] = (0.0, 0.2, 0.5, 0.8),
+    r: float = 0.01,
+    dt: float = 0.001,
+    dx: float = 0.0001,
+    x_left: float = 0.0,
+    x_right: float = 1.0,
+    title: str = "Exact solution",
+) -> None:
+    """Plot numerical reference solutions at several time points."""
     plt.figure(figsize=(8, 5))
 
     for t in times:
@@ -112,24 +131,38 @@ def plot_solution_times(
     plt.tight_layout()
     plt.show()
 
+
 def plot_1d_solution_comparison_few(
-    x,
-    reference,
-    regularized,
-    vanilla,
-    reference_label="Reference",
-    regularized_label="Regularized",
-    vanilla_label="Vanilla",
-    error_label="Absolute Error",
-    title_solution="Solution",
-    title_error="Pointwise Error",
-    filename=None,
-    save_dir="."
-):
+    x: ArrayLike,
+    reference: ArrayLike,
+    regularized: ArrayLike,
+    vanilla: ArrayLike,
+    reference_label: str = "Reference",
+    regularized_label: str = "Regularized",
+    vanilla_label: str = "Vanilla",
+    error_label: str = "Absolute Error",
+    title_solution: str = "Solution",
+    title_error: str = "Pointwise Error",
+    filename: str | None = None,
+    save_dir: str = ".",
+) -> None:
+    """Compare reference, regularized, and vanilla 1D solutions side by side."""
     x = x.cpu().detach().numpy() if torch.is_tensor(x) else np.asarray(x)
-    reference = reference.cpu().detach().numpy() if torch.is_tensor(reference) else np.asarray(reference)
-    regularized = regularized.cpu().detach().numpy() if torch.is_tensor(regularized) else np.asarray(regularized)
-    vanilla = vanilla.cpu().detach().numpy() if torch.is_tensor(vanilla) else np.asarray(vanilla)
+    reference = (
+        reference.cpu().detach().numpy()
+        if torch.is_tensor(reference)
+        else np.asarray(reference)
+    )
+    regularized = (
+        regularized.cpu().detach().numpy()
+        if torch.is_tensor(regularized)
+        else np.asarray(regularized)
+    )
+    vanilla = (
+        vanilla.cpu().detach().numpy()
+        if torch.is_tensor(vanilla)
+        else np.asarray(vanilla)
+    )
 
     regularized_error = np.abs(regularized - reference)
     vanilla_error = np.abs(vanilla - reference)
@@ -137,8 +170,12 @@ def plot_1d_solution_comparison_few(
     regularized_max_error = regularized_error.max()
     vanilla_max_error = vanilla_error.max()
 
-    regularized_l2re = np.sqrt(np.sum((regularized - reference) ** 2) / np.sum(reference ** 2))
-    vanilla_l2re = np.sqrt(np.sum((vanilla - reference) ** 2) / np.sum(reference ** 2))
+    regularized_l2re = np.sqrt(
+        np.sum((regularized - reference) ** 2) / np.sum(reference**2)
+    )
+    vanilla_l2re = np.sqrt(
+        np.sum((vanilla - reference) ** 2) / np.sum(reference**2)
+    )
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
 
@@ -149,18 +186,32 @@ def plot_1d_solution_comparison_few(
     ax1.set_ylabel("u(x)", fontsize=11)
     ax1.set_title(
         f"Regularized L2RE: {regularized_l2re:.2e} | Vanilla L2RE: {vanilla_l2re:.2e}",
-        fontsize=11
+        fontsize=11,
     )
     ax1.legend(loc="best", frameon=False)
     ax1.grid(True, alpha=0.3)
 
-    ax2.plot(x, regularized_error, "r--", linewidth=1.5, label=f"{regularized_label} error", alpha=0.8)
-    ax2.plot(x, vanilla_error, "g-.", linewidth=1.5, label=f"{vanilla_label} error", alpha=0.8)
+    ax2.plot(
+        x,
+        regularized_error,
+        "r--",
+        linewidth=1.5,
+        label=f"{regularized_label} error",
+        alpha=0.8,
+    )
+    ax2.plot(
+        x,
+        vanilla_error,
+        "g-.",
+        linewidth=1.5,
+        label=f"{vanilla_label} error",
+        alpha=0.8,
+    )
     ax2.set_xlabel("x", fontsize=11)
     ax2.set_ylabel(error_label, fontsize=11)
     ax2.set_title(
         f"Regularized max: {regularized_max_error:.2e} | Vanilla max: {vanilla_max_error:.2e}",
-        fontsize=11
+        fontsize=11,
     )
     ax2.legend(loc="best", frameon=False)
     ax2.grid(True, alpha=0.3)
@@ -175,17 +226,18 @@ def plot_1d_solution_comparison_few(
 
 
 def plot_1d_solution_comparison(
-    x,
-    pred,
-    exact,
-    pred_label="Predicted",
-    exact_label="Exact",
-    error_label="|Error|",
-    title_solution="Solution",
-    title_error="Pointwise Error",
-    filename=None,
-    save_dir="."
-):
+    x: ArrayLike,
+    pred: ArrayLike,
+    exact: ArrayLike,
+    pred_label: str = "Predicted",
+    exact_label: str = "Exact",
+    error_label: str = "|Error|",
+    title_solution: str = "Solution",
+    title_error: str = "Pointwise Error",
+    filename: str | None = None,
+    save_dir: str = ".",
+) -> None:
+    """Compare one predicted 1D solution with an exact/reference solution."""
     x = x.cpu().detach().numpy() if torch.is_tensor(x) else np.asarray(x)
     pred = pred.cpu().detach().numpy() if torch.is_tensor(pred) else np.asarray(pred)
     exact = exact.cpu().detach().numpy() if torch.is_tensor(exact) else np.asarray(exact)
@@ -219,14 +271,15 @@ def plot_1d_solution_comparison(
 
 
 def plot_solution_heatmap(
-    exact_solution,
-    prediction,
-    x,
-    t,
-    pred_label="Prediction",
-    exact_label="Exact solution",
-    error_label="Absolute Error",
-):
+    exact_solution: torch.Tensor | np.ndarray[Any, Any],
+    prediction: torch.Tensor | np.ndarray[Any, Any],
+    x: ArrayLike,
+    t: ArrayLike,
+    pred_label: str = "Prediction",
+    exact_label: str = "Exact solution",
+    error_label: str = "Absolute Error",
+) -> None:
+    """Plot prediction, exact solution, and absolute-error heatmaps."""
     exact_solution = (
         exact_solution.detach().cpu().numpy()
         if torch.is_tensor(exact_solution)

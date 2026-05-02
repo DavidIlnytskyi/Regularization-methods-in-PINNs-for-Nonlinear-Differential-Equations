@@ -1,23 +1,37 @@
-import sys
-import platform
-import subprocess
-from datetime import datetime
+"""General utilities for reproducibility, plotting style, and run metadata.
 
-import torch
+This module collects small helpers used across experiments: seeding, CUDA
+synchronization, environment snapshots, regularization-grid generation, and
+human-readable configuration serialization.
+"""
+
+import os
+import platform
+import random
+import subprocess
+import sys
+from collections.abc import Callable, Iterable
+from datetime import datetime
+from typing import Any
+
+import matplotlib as mpl
+import neurodiffeq
 import numpy as np
 import seaborn as sns
-import neurodiffeq
-import matplotlib as mpl
-import random
-import os
+import torch
 
 from data_classes import RunConfig
 
-def get_version(module):
+
+def get_version(module: Any) -> str:
+    """Return a module version string or a fallback for builtins/unknowns."""
     return getattr(module, "__version__", "builtin / unknown")
 
 
-def save_reproducibility_snapshot(filename="reproducibility_snapshot.txt"):
+def save_reproducibility_snapshot(
+    filename: str = "reproducibility_snapshot.txt",
+) -> None:
+    """Write environment, library, CUDA, and package-version details to a file."""
     with open(filename, "w") as f:
         f.write("===== REPRODUCIBILITY SNAPSHOT =====\n\n")
 
@@ -59,7 +73,9 @@ def save_reproducibility_snapshot(filename="reproducibility_snapshot.txt"):
         except Exception as e:
             f.write(f"Could not retrieve pip freeze: {e}\n")
 
-def is_colab():
+
+def is_colab() -> bool:
+    """Return whether the current runtime appears to be Google Colab."""
     try:
         import google.colab
 
@@ -67,7 +83,9 @@ def is_colab():
     except ImportError:
         return False
 
-def set_paper_style():
+
+def set_paper_style() -> None:
+    """Apply Matplotlib defaults suitable for compact paper figures."""
     mpl.rcParams.update(
         {
             "figure.figsize": (6, 4),
@@ -94,12 +112,15 @@ def set_paper_style():
         }
     )
 
-def sync_if_needed():
+
+def sync_if_needed() -> None:
+    """Synchronize CUDA work when a CUDA device is available."""
     if torch.cuda.is_available():
         torch.cuda.synchronize()
 
 
-def set_seed(seed: int):
+def set_seed(seed: int) -> None:
+    """Seed Python, NumPy, and PyTorch for deterministic experiments."""
     random.seed(seed)
     np.random.seed(seed)
 
@@ -111,13 +132,17 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
     torch.use_deterministic_algorithms(True)
 
+
 def build_regularization_values(
-    regnames=("UR", "J", "gPINN", "L1", "L2"),
-    ks=(2, 4, 7),
-    powers=range(-6, 6),
-    include_baseline=True,
-):
-    def generate_lambdas():
+    regnames: Iterable[str] = ("UR", "J", "gPINN", "L1", "L2"),
+    ks: Iterable[int] = (2, 4, 7),
+    powers: Iterable[int] = range(-6, 6),
+    include_baseline: bool = True,
+) -> dict[str | None, list[float]]:
+    """Build candidate regularization strengths for each regularizer name."""
+
+    def generate_lambdas() -> list[float]:
+        """Return all coefficient values from ``ks`` and powers of ten."""
         return [k * (10**p) for k in ks for p in powers]
 
     values = {name: generate_lambdas() for name in regnames}
@@ -127,7 +152,9 @@ def build_regularization_values(
 
     return values
 
-def _callable_name(value):
+
+def _callable_name(value: Callable[..., Any]) -> str:
+    """Return a stable display name for a callable."""
     module = getattr(value, "__module__", None)
     qualname = getattr(value, "__qualname__", None) or getattr(value, "__name__", None)
     if qualname is None:
@@ -137,7 +164,8 @@ def _callable_name(value):
     return qualname
 
 
-def _format_config_value(value, indent=0):
+def _format_config_value(value: Any, indent: int = 0) -> str:
+    """Format dataclasses and nested containers as readable multiline text."""
     child_indent = indent + 2
     child_pad = " " * child_indent
     simple_types = (str, int, float, bool, type(None))
@@ -197,7 +225,12 @@ def _format_config_value(value, indent=0):
     return repr(value)
 
 
-def save_run_config_txt(config: RunConfig, save_dir: str, regularization_setup=None):
+def save_run_config_txt(
+    config: RunConfig,
+    save_dir: str,
+    regularization_setup: Any = None,
+) -> str:
+    """Save a text snapshot of the full run configuration and return its path."""
     os.makedirs(save_dir, exist_ok=True)
     path = os.path.join(save_dir, "run_config.txt")
 
